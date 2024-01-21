@@ -553,6 +553,39 @@ extension VercelOutput {
         let dockerToolPath = try context.tool(named: "docker").path
         let baseImage = "swift:\(context.package.toolsVersion.major).\(context.package.toolsVersion.minor)-amazonlinux2"
 
+        let cleanCommand = arguments.contains("--clean")
+        ? "rm -rf .build && rm -rf ~/.swift/pm && "
+        : ""
+        
+        let buildCommand = "\(cleanCommand)swift build -c release -Xswiftc -Osize -Xlinker -S --product \(product.name) --static-swift-stdlib"
+
+        let workspacePathPrefix = arguments.contains("--parent")
+        ? context.package.directory.removingLastComponent()
+        : context.package.directory
+
+        let lastPathComponent = arguments.contains("--parent")
+        ? context.package.directory.lastComponent
+        : ""
+
+        // get the build output path
+        let buildOutputPathCommand = "\(buildCommand) --show-bin-path"
+        let dockerBuildOutputPath = try Shell.execute(
+            executable: dockerToolPath,
+            arguments: [
+                "run",
+                "--platform", "linux/\(architecture.rawValue)",
+                "--rm",
+                "-v", "\(workspacePathPrefix):/workspace",
+                "-w", "/workspace/\(lastPathComponent)",
+                baseImage,
+                "bash", "-cl", buildOutputPathCommand
+            ]
+        )
+        guard let buildPathOutput = dockerBuildOutputPath.split(separator: "\n").last else {
+            throw BuildError.failedParsingDockerOutput(dockerBuildOutputPath)
+        }
+        let buildOutputPath = Path(buildPathOutput.replacingOccurrences(of: "/workspace", with: context.package.directory.string))
+
         // build the product
         try Shell.execute(
             executable: dockerToolPath,
@@ -560,8 +593,8 @@ extension VercelOutput {
                 "run",
                 "--platform", "linux/\(architecture.rawValue)",
                 "--rm",
-                "-v", "\(context.package.directory.string):/workspace",
-                "-w", "/workspace",
+                "-v", "\(workspacePathPrefix):/workspace",
+                "-w", "/workspace/\(lastPathComponent)",
                 baseImage,
                 "bash", "-cl", "swift build -c release --static-swift-stdlib"
             ]

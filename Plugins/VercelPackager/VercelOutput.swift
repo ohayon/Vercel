@@ -557,7 +557,7 @@ extension VercelOutput {
         ? "rm -rf .build && rm -rf ~/.swift/pm && "
         : ""
         
-        let buildCommand = "\(cleanCommand)swift build -c release -Xswiftc -Osize -Xlinker -S --product \(product.name) --static-swift-stdlib"
+        let buildCommand = "swift build -c release -Xswiftc -Osize -Xlinker -S --product \(product.name) --static-swift-stdlib"
 
         let workspacePathPrefix = arguments.contains("--parent")
         ? context.package.directory.removingLastComponent()
@@ -568,7 +568,7 @@ extension VercelOutput {
         : ""
 
         // get the build output path
-        let buildOutputPathCommand = "\(buildCommand) --show-bin-path"
+        let buildOutputPathCommand = "\(cleanCommand)\(buildCommand) --show-bin-path"
         let dockerBuildOutputPath = try Shell.execute(
             executable: dockerToolPath,
             arguments: [

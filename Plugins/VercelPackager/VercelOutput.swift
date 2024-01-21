@@ -584,7 +584,8 @@ extension VercelOutput {
         guard let buildPathOutput = dockerBuildOutputPath.split(separator: "\n").last else {
             throw BuildError.failedParsingDockerOutput(dockerBuildOutputPath)
         }
-        let buildOutputPath = Path(buildPathOutput.replacingOccurrences(of: "/workspace", with: context.package.directory.string))
+
+        let buildOutputPath = Path(buildPathOutput.replacingOccurrences(of: "/workspace/\(lastPathComponent)", with: context.package.directory.string))
 
         // build the product
         try Shell.execute(

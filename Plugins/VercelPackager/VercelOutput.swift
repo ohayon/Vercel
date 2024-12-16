@@ -557,9 +557,7 @@ extension VercelOutput {
         ? "rm -rf .build && rm -rf ~/.swift/pm && "
         : ""
         
-        let buildCommand = "swift build -c release -Xswiftc -Osize -Xlinker -S --product \(product.name) --static-swift-stdlib"
-
-        let compressCommand = " && /opt/homebrew/bin/upx --best .build/release/\(product.name)"
+        let buildCommand = "swift build -c release -Xswiftc -Osize -Xlinker -S --product \(product.name) --static-swift-stdlib && strip \(buildOutputPath.string)"
 
         let workspacePathPrefix = arguments.contains("--parent")
         ? context.package.directory.removingLastComponent()
@@ -599,7 +597,7 @@ extension VercelOutput {
                 "-v", "\(workspacePathPrefix):/workspace",
                 "-w", "/workspace/\(lastPathComponent)",
                 baseImage,
-                "bash", "-cl", "swift build -c release --static-swift-stdlib"
+                "bash", "-cl", buildCommand
             ]
         )
 
@@ -611,25 +609,6 @@ extension VercelOutput {
         }
 
         print("*******************************************************************")
-
-        try Shell.execute(
-            executable: dockerToolPath,
-            arguments: [
-                "run",
-                "--platform", "linux/\(architecture.rawValue)",
-                "--rm",
-                "-v", "\(workspacePathPrefix):/workspace",
-                "-w", "/workspace/\(lastPathComponent)",
-                baseImage,
-                "bash", "-cl", """
-                set -e && \
-                yum install -y xz && \
-                curl -fsSL -o /usr/local/bin/upx https://github.com/upx/upx/releases/download/v4.2.1/upx-4.2.1-aarch64_linux && \
-                chmod +x /usr/local/bin/upx && \
-                upx --best \(productPath.string)
-                """
-            ]
-        )
 
         return productPath
     }

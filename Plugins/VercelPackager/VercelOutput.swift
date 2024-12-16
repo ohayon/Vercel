@@ -557,7 +557,7 @@ extension VercelOutput {
         ? "rm -rf .build && rm -rf ~/.swift/pm && "
         : ""
         
-        let buildCommand = "swift build -c release -Xswiftc -Osize -Xlinker -S --product \(product.name) --static-swift-stdlib && strip \(productPath.string)"
+        let buildCommand = "swift build -c release -Xswiftc -Osize -Xlinker -S --product \(product.name) --static-swift-stdlib"
 
         let workspacePathPrefix = arguments.contains("--parent")
         ? context.package.directory.removingLastComponent()
@@ -607,6 +607,19 @@ extension VercelOutput {
             Diagnostics.error("expected '\(product.name)' binary at \"\(productPathFinal.string)\"")
             throw BuildError.productExecutableNotFound(product.name)
         }
+
+        try Shell.execute(
+            executable: dockerToolPath,
+            arguments: [
+                "run",
+                "--platform", "linux/\(architecture.rawValue)",
+                "--rm",
+                "-v", "\(workspacePathPrefix):/workspace",
+                "-w", "/workspace/\(lastPathComponent)",
+                baseImage,
+                "bash", "-cl", "strip \(productPathFinal.string)"
+            ]
+        )
 
         print("*******************************************************************")
 

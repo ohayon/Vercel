@@ -610,6 +610,8 @@ extension VercelOutput {
             throw BuildError.productExecutableNotFound(product.name)
         }
 
+        print("*******************************************************************")
+
         try Shell.execute(
             executable: dockerToolPath,
             arguments: [

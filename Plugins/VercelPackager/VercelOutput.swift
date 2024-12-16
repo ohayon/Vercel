@@ -559,6 +559,8 @@ extension VercelOutput {
         
         let buildCommand = "swift build -c release -Xswiftc -Osize -Xlinker -S --product \(product.name) --static-swift-stdlib"
 
+        let compressCommand = " && upx --best .build/release/\(product.name)"
+
         let workspacePathPrefix = arguments.contains("--parent")
         ? context.package.directory.removingLastComponent()
         : context.package.directory
@@ -568,7 +570,7 @@ extension VercelOutput {
         : ""
 
         // get the build output path
-        let buildOutputPathCommand = "\(cleanCommand)\(buildCommand) --show-bin-path"
+        let buildOutputPathCommand = "\(cleanCommand)\(buildCommand) --show-bin-path\(compressCommand)"
         let dockerBuildOutputPath = try Shell.execute(
             executable: dockerToolPath,
             arguments: [
@@ -585,11 +587,7 @@ extension VercelOutput {
             throw BuildError.failedParsingDockerOutput(dockerBuildOutputPath)
         }
 
-        print("********** LAST PATH COMPONENT: \(lastPathComponent)")
-
         let buildOutputPath = Path(buildPathOutput.replacingOccurrences(of: "/workspace/\(lastPathComponent)", with: context.package.directory.string))
-
-        print("********** BUILD OUTPUT PATH: \(buildOutputPath)")
 
         // build the product
         try Shell.execute(

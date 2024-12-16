@@ -620,6 +620,7 @@ extension VercelOutput {
                 "-w", "/workspace/\(lastPathComponent)",
                 baseImage,
                 "bash", "-cl", """
+                yum install -y xz && \
                 mkdir -p /usr/local/bin && \
                 curl -L -o /usr/local/bin/upx https://github.com/upx/upx/releases/download/v4.2.1/upx-4.2.1-aarch64_linux && \
                 chmod +x /usr/local/bin/upx && \

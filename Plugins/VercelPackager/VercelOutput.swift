@@ -559,7 +559,7 @@ extension VercelOutput {
         
         let buildCommand = "swift build -c release -Xswiftc -Osize -Xlinker -S --product \(product.name) --static-swift-stdlib"
 
-        let compressCommand = " && upx --best .build/release/\(product.name)"
+        let compressCommand = " && /opt/homebrew/bin/upx --best .build/release/\(product.name)"
 
         let workspacePathPrefix = arguments.contains("--parent")
         ? context.package.directory.removingLastComponent()
@@ -569,8 +569,27 @@ extension VercelOutput {
         ? context.package.directory.lastComponent
         : ""
 
+        let installCommand = """
+        mkdir -p /usr/local/bin && \
+        curl -L -o /usr/local/bin/upx https://github.com/upx/upx/releases/download/v4.2.1/upx-4.2.1-aarch64_linux && \
+        chmod +x /usr/local/bin/upx
+        """
+
+        try Shell.execute(
+            executable: dockerToolPath,
+            arguments: [
+                "run",
+                "--platform", "linux/\(architecture.rawValue)",
+                "--rm",
+                "-v", "\(workspacePathPrefix):/workspace",
+                "-w", "/workspace/\(lastPathComponent)",
+                baseImage,
+                "bash", "-cl", installCommand
+            ]
+        )
+
         // get the build output path
-        let buildOutputPathCommand = "\(cleanCommand)\(buildCommand) --show-bin-path\(compressCommand)"
+        let buildOutputPathCommand = "\(cleanCommand)\(buildCommand) --show-bin-path"
         let dockerBuildOutputPath = try Shell.execute(
             executable: dockerToolPath,
             arguments: [
@@ -609,6 +628,20 @@ extension VercelOutput {
             Diagnostics.error("expected '\(product.name)' binary at \"\(productPath.string)\"")
             throw BuildError.productExecutableNotFound(product.name)
         }
+
+        try Shell.execute(
+            executable: dockerToolPath,
+            arguments: [
+                "run",
+                "--platform", "linux/\(architecture.rawValue)",
+                "--rm",
+                "-v", "\(workspacePathPrefix):/workspace",
+                "-w", "/workspace/\(lastPathComponent)",
+                baseImage,
+                "bash", "-cl", "upx --best \(productPath.string)"
+            ]
+        )
+
         return productPath
     }
 }

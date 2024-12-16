@@ -558,6 +558,7 @@ extension VercelOutput {
         : ""
         
         let buildCommand = "swift build -c release -Xswiftc -Osize -Xlinker -S --product \(product.name) --static-swift-stdlib"
+        let buildOutputPathCommand = "\(cleanCommand)\(buildCommand) --show-bin-path"
 
         let workspacePathPrefix = arguments.contains("--parent")
         ? context.package.directory.removingLastComponent()
@@ -567,8 +568,12 @@ extension VercelOutput {
         ? context.package.directory.lastComponent
         : ""
 
+        let dockerWorkspacePath = "/workspace/\(lastPathComponent)"
+        
+        print("Debug: Docker workspace path: \(dockerWorkspacePath)")
+        print("Debug: Host workspace path: \(workspacePathPrefix)")
+
         // get the build output path
-        let buildOutputPathCommand = "\(cleanCommand)\(buildCommand) --show-bin-path"
         let dockerBuildOutputPath = try Shell.execute(
             executable: dockerToolPath,
             arguments: [
@@ -576,16 +581,20 @@ extension VercelOutput {
                 "--platform", "linux/\(architecture.rawValue)",
                 "--rm",
                 "-v", "\(workspacePathPrefix):/workspace",
-                "-w", "/workspace/\(lastPathComponent)",
+                "-w", dockerWorkspacePath,
                 baseImage,
-                "bash", "-cl", buildOutputPathCommand
+                "bash", "-cl", "pwd && \(buildOutputPathCommand)"
             ]
         )
+        print("Debug: Docker build output: \(dockerBuildOutputPath)")
+        
         guard let buildPathOutput = dockerBuildOutputPath.split(separator: "\n").last else {
             throw BuildError.failedParsingDockerOutput(dockerBuildOutputPath)
         }
+        print("Debug: Build path output: \(buildPathOutput)")
 
-        let productPath = Path(buildPathOutput.replacingOccurrences(of: "/workspace/\(lastPathComponent)", with: context.package.directory.string))
+        let productPath = Path(buildPathOutput.replacingOccurrences(of: dockerWorkspacePath, with: context.package.directory.string))
+        print("Debug: Product path: \(productPath)")
 
         // build the product
         try Shell.execute(
@@ -595,19 +604,22 @@ extension VercelOutput {
                 "--platform", "linux/\(architecture.rawValue)",
                 "--rm",
                 "-v", "\(workspacePathPrefix):/workspace",
-                "-w", "/workspace/\(lastPathComponent)",
+                "-w", dockerWorkspacePath,
                 baseImage,
-                "bash", "-cl", buildCommand
+                "bash", "-cl", "\(buildCommand) && ls -la .build/release/"
             ]
         )
 
         // ensure the final binary built correctly
         let productPathFinal = swiftBuildReleaseDirectory.appending(product.name)
+        print("Debug: Final product path: \(productPathFinal)")
         guard fs.fileExists(atPath: productPathFinal.string) else {
             Diagnostics.error("expected '\(product.name)' binary at \"\(productPathFinal.string)\"")
             throw BuildError.productExecutableNotFound(product.name)
         }
 
+        // strip the binary
+        let stripCommand = "ls -la .build/release/\(product.name) && strip .build/release/\(product.name) && ls -la .build/release/\(product.name)"
         try Shell.execute(
             executable: dockerToolPath,
             arguments: [
@@ -615,14 +627,12 @@ extension VercelOutput {
                 "--platform", "linux/\(architecture.rawValue)",
                 "--rm",
                 "-v", "\(workspacePathPrefix):/workspace",
-                "-w", "/workspace/\(lastPathComponent)",
+                "-w", dockerWorkspacePath,
                 baseImage,
-                "bash", "-cl", "strip \(productPathFinal.string)"
+                "bash", "-cl", stripCommand
             ]
         )
-
         print("*******************************************************************")
-
         return productPathFinal
     }
 }

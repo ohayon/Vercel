@@ -557,7 +557,7 @@ extension VercelOutput {
         ? "rm -rf .build && rm -rf ~/.swift/pm && "
         : ""
         
-        let buildCommand = "swift build -c release -Xswiftc -Osize -Xlinker -S --product \(product.name) --static-swift-stdlib && strip \(buildOutputPath.string)"
+        let buildCommand = "swift build -c release -Xswiftc -Osize -Xlinker -S --product \(product.name) --static-swift-stdlib && strip \(productPath.string)"
 
         let workspacePathPrefix = arguments.contains("--parent")
         ? context.package.directory.removingLastComponent()
@@ -585,7 +585,7 @@ extension VercelOutput {
             throw BuildError.failedParsingDockerOutput(dockerBuildOutputPath)
         }
 
-        let buildOutputPath = Path(buildPathOutput.replacingOccurrences(of: "/workspace/\(lastPathComponent)", with: context.package.directory.string))
+        let productPath = Path(buildPathOutput.replacingOccurrences(of: "/workspace/\(lastPathComponent)", with: context.package.directory.string))
 
         // build the product
         try Shell.execute(
@@ -602,15 +602,15 @@ extension VercelOutput {
         )
 
         // ensure the final binary built correctly
-        let productPath = swiftBuildReleaseDirectory.appending(product.name)
-        guard fs.fileExists(atPath: productPath.string) else {
-            Diagnostics.error("expected '\(product.name)' binary at \"\(productPath.string)\"")
+        let productPathFinal = swiftBuildReleaseDirectory.appending(product.name)
+        guard fs.fileExists(atPath: productPathFinal.string) else {
+            Diagnostics.error("expected '\(product.name)' binary at \"\(productPathFinal.string)\"")
             throw BuildError.productExecutableNotFound(product.name)
         }
 
         print("*******************************************************************")
 
-        return productPath
+        return productPathFinal
     }
 }
 
